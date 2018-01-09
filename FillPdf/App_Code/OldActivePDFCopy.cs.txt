@@ -1,0 +1,99 @@
+﻿using System;
+using System.IO;
+using System.Web.Configuration;
+
+namespace FillPdf.App_Code
+{
+    public class FillPDF
+    {
+        public static string CreatePDF(string txt1, string txt2)
+        {
+            
+            int intOpenOutputFile;
+            int intOpenInputFile;
+            int intCopyForm;
+            string PdfTemplates = "";
+            string PdfTarget = "";
+            string newFileName = string.Format(@"{0}.pdf", DateTime.Now.Ticks);
+
+            try
+            {
+                // https://examples.activepdf.com/Toolkit/2011/Basic_Form_Filling.cs                
+                // Instantiate Object
+                APToolkitNET.Toolkit oTK = new APToolkitNET.Toolkit();
+
+                PdfTemplates = WebConfigurationManager.AppSettings["PdfTemplates"];
+                PdfTarget = WebConfigurationManager.AppSettings["PdfTarget"];                              
+
+                // Run clean-up to delete old PDFs
+                DirectoryInfo d = new DirectoryInfo(PdfTarget);
+                foreach (FileInfo f in d.GetFiles())
+                {
+                    if (f.CreationTime.AddHours(1) < DateTime.Now)
+                        File.Delete(f.FullName);
+                }
+
+                // Create new PDF
+                intOpenOutputFile = oTK.OpenOutputFile(PdfTarget + newFileName);
+                if (intOpenOutputFile != 0)
+                {
+                    ErrorHandler("OpenOutputFile", intOpenOutputFile);
+                }
+
+                // Open the template PDF
+                intOpenInputFile = oTK.OpenInputFile(PdfTemplates + "template.pdf");
+                if (intOpenInputFile != 0)
+                {
+                    ErrorHandler("OpenInputFile", intOpenInputFile);
+                }
+
+                // Set how you want form field data formatting to be handled
+                // By default the field will remain the same (1)
+                // You can have the field formatting be ignored (0)
+                oTK.DoFormFormatting = 1;
+
+                // As we will be using the same PDF form for multiple pages we do not want
+                // the field names to conflict as different data will be in same named fields
+                // Using FormNumbering will rename the fields so they do not conflict
+                // field 'name' would become 'name__1', 'name__2', etc
+                // 0 = False, 1 = True
+                oTK.FormNumbering = 1;
+
+                // Populate form fields for the first page with data
+                // Refer to the documentation for possible flag options
+                oTK.SetFormFieldData("text1", txt1, 1);
+                oTK.SetFormFieldData("text2", txt2, 1);
+
+                // Copy the first page(with field data) to the new pdf
+                intCopyForm = oTK.CopyForm(0, 0);
+                if (intCopyForm != 1)
+                {
+                    ErrorHandler("CopyForm", intCopyForm);
+                }
+
+                // Set whether to flatten all other fields not touched by SetFormFieldData
+                oTK.FlattenRemainingFormFields = 1;
+
+                // Close the new file to complete PDF creation
+                oTK.CloseOutputFile();
+
+                // Release Object
+                oTK.Dispose();
+
+                return newFileName;
+
+            } catch (Exception ex)
+            {
+                return ex.Message;
+            }
+            
+        }
+
+        // Error Handling
+        public static void ErrorHandler(string strMethod, object rtnCode)
+        {
+            throw new Exception(strMethod + " error:  " + rtnCode.ToString());
+        }
+        
+    }
+}
